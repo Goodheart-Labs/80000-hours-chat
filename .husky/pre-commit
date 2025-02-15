@@ -1,0 +1,5 @@
+bun run check
+bun run lint:fix
+bun run format
+# Stage any files that were modified by linting/formatting
+git add -A
