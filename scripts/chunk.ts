@@ -1,13 +1,16 @@
 import { readdir } from "fs/promises";
 import matter from "gray-matter";
-
+import { openai } from "@ai-sdk/openai";
+import { embed, embedMany } from "ai";
+import { embeddings, InsertEmbedding } from "../db/schema";
+import { db } from "../db/index";
 const PATH_TO_FILES =
   "/Users/robgordon/Dev/playground/ingest-80000/scraped/markdown";
 
 // list all md in ./scraped/markdown
 // list files
 const files = await readdir(PATH_TO_FILES);
-console.log(files.length);
+console.log(`${files.length} files found`);
 
 const filteredFiles = files
   // Filter out archive files
@@ -17,31 +20,63 @@ const filteredFiles = files
   // Filter out podcast episodes
   .filter((file) => !file.startsWith("podcastepisodes"))
   // Filter out job board files
-  .filter((file) => !file.includes("job-board"));
+  .filter((file) => !file.includes("job-board"))
+  // Sort by filename
+  .sort();
 
-async function processFile(file: string) {
+async function processFile(
+  file: string,
+): Promise<Omit<InsertEmbedding, "embedding">[]> {
   // read the file
   const fileContent = await Bun.file(`${PATH_TO_FILES}/${file}`).text();
   const { data, content } = matter(fileContent);
-  const { source_url, filename } = data as {
+  const { source_url = "" } = data as {
     source_url: string;
     filename: string;
   };
-  console.log({ source_url, filename });
-  const splitContent = splitMarkdown(content);
-  const chunks = prepareChunks(splitContent);
-  if (chunks.length > 0) {
-    const chunk = chunks[Math.floor(Math.random() * chunks.length)];
-    console.log(chunk.length);
+
+  let sourceUrl;
+  if (source_url.includes("https://80000hours.org")) {
+    sourceUrl = source_url.split("https://80000hours.org")[1];
+  } else {
+    sourceUrl = "https://80000hours.org";
   }
+
+  // Sanitize the content before splitting
+  const sanitizedContent = sanitizeContent(content);
+  const splitContent = splitMarkdown(sanitizedContent);
+  const chunks = prepareChunks(splitContent);
+  return chunks.map((chunk) => ({
+    sourceUrl,
+    content: sanitizeContent(chunk), // Also sanitize individual chunks
+  }));
 }
 
-// pick a random file from the list
-const randomFile =
-  filteredFiles[Math.floor(Math.random() * filteredFiles.length)];
-console.log(randomFile);
+async function main() {
+  const flattenedChunks: Omit<InsertEmbedding, "embedding">[] = [];
+  for (const file of filteredFiles) {
+    const chunks = await processFile(file);
+    flattenedChunks.push(...chunks);
+  }
+  console.log(`${flattenedChunks.length} chunks found`);
 
-processFile(randomFile);
+  // Handle 100 chunks at a time
+  for (let i = 0; i < flattenedChunks.length; i += 100) {
+    try {
+      console.log(`${i}/${flattenedChunks.length} chunks processed`);
+      const chunk = flattenedChunks.slice(i, i + 100);
+      const chunkEmbeddings = await generateEmbeddings(chunk);
+      await db.insert(embeddings).values(chunkEmbeddings);
+    } catch (error) {
+      console.log(`Error processing chunk ${i}`);
+      console.error(error);
+    }
+  }
+
+  console.log("Done");
+}
+
+main();
 
 /**
  * This function splits markdown content on headers #,##,###
@@ -132,4 +167,38 @@ function filterSection(section: string) {
     return section.split(footerLinks)[0];
   }
   return section;
+}
+
+const embeddingModel = openai.embedding("text-embedding-3-small", {
+  dimensions: 1536,
+});
+
+function sanitizeContent(text: string): string {
+  return text
+    .replace(/\0/g, "") // Remove null bytes
+    .replace(/[\uFFFD\uFFFE\uFFFF]/g, "") // Remove invalid UTF-8 characters
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "") // Remove control characters
+    .trim();
+}
+
+async function generateEmbedding(value: string): Promise<number[]> {
+  const input = sanitizeContent(value.replaceAll("\\n", " "));
+  const { embedding } = await embed({
+    model: embeddingModel,
+    value: input,
+  });
+  return embedding;
+}
+
+async function generateEmbeddings(
+  chunks: Omit<InsertEmbedding, "embedding">[],
+): Promise<InsertEmbedding[]> {
+  const { embeddings } = await embedMany({
+    model: embeddingModel,
+    values: chunks.map((chunk) => chunk.content),
+  });
+  return chunks.map((chunk, index) => ({
+    ...chunk,
+    embedding: embeddings[index],
+  }));
 }
