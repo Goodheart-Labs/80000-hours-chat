@@ -1,9 +1,9 @@
 import { readdir } from "fs/promises";
 import matter from "gray-matter";
-import { openai } from "@ai-sdk/openai";
 import { embed, embedMany } from "ai";
-import { embeddings, InsertEmbedding } from "../db/schema";
-import { db } from "../db/index";
+import { embeddings, InsertEmbedding } from "../src/db/schema";
+import { db } from "../src/db/index";
+import { embeddingModel } from "@/lib/shared";
 const PATH_TO_FILES =
   "/Users/robgordon/Dev/playground/ingest-80000/scraped/markdown";
 
@@ -168,10 +168,6 @@ function filterSection(section: string) {
   }
   return section;
 }
-
-const embeddingModel = openai.embedding("text-embedding-3-small", {
-  dimensions: 1536,
-});
 
 function sanitizeContent(text: string): string {
   return text
