@@ -53,8 +53,8 @@ async function replyWithCitations(question: string) {
   const documents = createDocuments(resources);
   console.log(documents);
 
-  // Stream message
-  return anthropic.messages.stream({
+  // Stream message using Anthropic
+  const stream = anthropic.messages.stream({
     model: "claude-3-5-sonnet-latest",
     max_tokens: 1024,
     temperature: 0,
@@ -66,6 +66,34 @@ async function replyWithCitations(question: string) {
         content: [{ type: "text", text: String(question) }],
       },
     ],
+  });
+
+  // Create a ReadableStream that transforms the Anthropic stream
+  const textStream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      for await (const message of stream) {
+        console.log(message);
+        if (message.type === "content_block_delta") {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ text: message.delta.text })}\n\n`,
+            ),
+          );
+        }
+      }
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
+
+  // Return a streaming response
+  return new Response(textStream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
   });
 }
 
