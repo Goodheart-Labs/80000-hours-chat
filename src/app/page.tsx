@@ -8,10 +8,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
+import { MemoizedMarkdown } from "@/components/MemoizedMarkdown";
 
 export default function Chat() {
   const { messages, input, handleInputChange, handleSubmit } = useChat({
     maxSteps: 3,
+    initialInput: "How should I choose a career path?",
   });
   return (
     <div className="grid w-full max-w-2xl py-24 mx-auto">
@@ -25,12 +27,17 @@ export default function Chat() {
                     return (
                       <div
                         key={m.id + index.toString()}
-                        className="grid gap-2 p-4 rounded-lg bg-white/50 shadow-sm"
+                        className="grid gap-2 p-4 rounded-lg bg-white/50 border border-slate-200 shadow-sm"
                       >
                         <div className="font-medium text-sm text-muted-foreground">
                           {m.role === "assistant" ? "AI Assistant" : "You"}
                         </div>
-                        <p className="text-sm leading-relaxed">{part.text}</p>
+                        <div className="text-sm leading-relaxed prose prose-sm prose-slate max-w-none">
+                          <MemoizedMarkdown
+                            content={part.text}
+                            id={m.id + "-" + index}
+                          />
+                        </div>
                       </div>
                     );
                   case "tool-invocation":

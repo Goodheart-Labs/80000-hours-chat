@@ -1,0 +1,5 @@
+---
+description: Always use bun to install and test
+globs: 
+---
+Use bun to install and test and run things

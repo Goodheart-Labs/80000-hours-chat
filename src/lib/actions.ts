@@ -22,10 +22,14 @@ export async function findRelevantResources(query: string) {
     userQueryEmbedded,
   )})`;
   const similarGuides = await db
-    .select({ name: embeddings.content, similarity })
+    .select({
+      content: embeddings.content,
+      similarity,
+      sourceUrl: embeddings.sourceUrl,
+    })
     .from(embeddings)
-    .where(gt(similarity, 0.5))
+    .where(gt(similarity, 0.55))
     .orderBy((t) => desc(t.similarity))
-    .limit(4);
+    .limit(8);
   return similarGuides;
 }
