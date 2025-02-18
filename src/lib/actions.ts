@@ -30,6 +30,6 @@ export async function findRelevantResources(query: string) {
     .from(embeddings)
     .where(gt(similarity, 0.55))
     .orderBy((t) => desc(t.similarity))
-    .limit(8);
+    .limit(20);
   return similarGuides;
 }

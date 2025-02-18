@@ -29,10 +29,11 @@ async function replyWithCitations(question: string) {
   const {
     object: { answer },
   } = await generateObject({
-    model: openai("gpt-4o"),
+    model: openai("gpt-4o-mini"),
     schema: z.object({
       answer: z.string(),
     }),
+    temperature: 1,
     system:
       "You are a research assistant for personalized career advice. Come up with a hypothetical one-sentence answer to the user's question to add in locating relevant resources.",
     messages: [
@@ -42,23 +43,21 @@ async function replyWithCitations(question: string) {
       },
     ],
   });
-
   console.log({ answer });
 
   // Find relevant resources
   const resources = await findRelevantResources(answer);
-  console.log(resources);
 
   // Create documents
   const documents = createDocuments(resources);
-  console.log(documents);
 
   // Stream message using Anthropic
   const stream = anthropic.messages.stream({
     model: "claude-3-5-sonnet-latest",
-    max_tokens: 1024,
-    temperature: 0,
+    max_tokens: 2048,
     stream: true,
+    system:
+      "You are a career advice assistant that provides personalized advice aimed at maximizing the positive impact an individual can have through their work using resources from 80000hours.org to answer the user's question. Always return your text with supporting citations from the resources.",
     messages: [
       documents,
       {
@@ -74,15 +73,28 @@ async function replyWithCitations(question: string) {
       const encoder = new TextEncoder();
       for await (const message of stream) {
         console.log(message);
+
         if (message.type === "content_block_delta") {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ text: message.delta.text })}\n\n`,
-            ),
-          );
+          if (message.delta.type === "text_delta") {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ text: message.delta.text })}\n\n`,
+              ),
+            );
+          } else if (message.delta.type === "citations_delta") {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  citation: {
+                    cited_text: message.delta.citation.cited_text,
+                    document_title: message.delta.citation.document_title,
+                  },
+                })}\n\n`,
+              ),
+            );
+          }
         }
       }
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       controller.close();
     },
   });
@@ -105,31 +117,13 @@ function createDocuments(
     content: resources.map(({ content, similarity, sourceUrl }) => ({
       type: "document" as const,
       source: {
-        type: "content",
-        content,
+        type: "text",
+        media_type: "text/plain",
+        data: content,
       },
-      title: sourceUrl,
-      context: JSON.stringify({ similarity }),
+      // title: sourceUrl,
+      context: JSON.stringify({ similarity, sourceUrl }),
       citations: { enabled: true },
     })),
   };
 }
-
-// const result = streamText({
-//   model: openai("gpt-4o"),
-//   system:
-//     "You are a helpful assistant that provides personalized career advice aimed at maximizing the positive impact an individual can have through their work. You can only respond to questions using information from relevant resources. To find relevant resources provide the 'findRelevantResources' tool with a one-sentence hypothetical answer to the question. Use the resources to answer the question.",
-//   messages,
-//   tools: {
-//     findRelevantResources: tool({
-//       description: "Find relevant resources for a given query",
-//       parameters: z.object({
-//         hypotheticalAnswer: z.string(),
-//       }),
-//       execute: async ({ hypotheticalAnswer }) =>
-//         findRelevantResources(hypotheticalAnswer),
-//     }),
-//   },
-// });
-
-// return result.toDataStreamResponse();
