@@ -2,25 +2,15 @@
 
 import { useState } from "react";
 import { MemoizedMarkdown } from "@/components/MemoizedMarkdown";
-
-type Citation = {
-  citedText: string;
-  sourceUrl: string;
-};
-
-type StreamChunk = {
-  text?: string;
-  citation?: {
-    cited_text: string;
-    document_title: string;
-  };
-};
+import { StreamChunk } from "@/lib/types";
+import { Resource } from "@/lib/types";
+import { Loader2 } from "lucide-react";
 
 export default function Chat() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string>("");
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [citations, setCitations] = useState<Citation[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -29,7 +19,7 @@ export default function Chat() {
 
     setIsLoading(true);
     setAnswer("");
-    setCitations([]);
+    setResources([]);
 
     try {
       const response = await fetch("/api/chat", {
@@ -57,19 +47,30 @@ export default function Chat() {
             try {
               const parsed: StreamChunk = JSON.parse(data);
 
-              if (parsed.text) {
-                setAnswer((prev) => prev + parsed.text);
-              }
-
-              if (parsed.citation) {
-                setAnswer((prev) => prev + parsed.citation?.document_title);
-                // setCitations((prev) => [
-                //   ...prev,
-                //   {
-                //     citedText: parsed.citation!.cited_text,
-                //     sourceUrl: parsed.citation!.document_title,
-                //   },
-                // ]);
+              switch (parsed.type) {
+                case "text":
+                  if (parsed.text) {
+                    setAnswer((prev) => prev + parsed.text);
+                  }
+                  break;
+                case "citation":
+                  if (parsed.citation) {
+                    const citationData = btoa(
+                      unescape(
+                        encodeURIComponent(JSON.stringify(parsed.citation)),
+                      ),
+                    );
+                    setAnswer(
+                      (prev) =>
+                        prev + `<cite data-parsed="${citationData}"></cite>`,
+                    );
+                  }
+                  break;
+                case "resources":
+                  if (parsed.resources) {
+                    setResources(parsed.resources);
+                  }
+                  break;
               }
             } catch (e) {
               console.error("Failed to parse chunk", e);
@@ -89,13 +90,24 @@ export default function Chat() {
     <div className="grid w-full max-w-2xl py-12 mx-auto">
       <div className="grid gap-6">
         <form onSubmit={handleSubmit}>
-          <input
-            className="w-full p-3 text-lg rounded-lg shadow-inner bg-slate-100 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50 tracking-wide"
-            value={question}
-            placeholder="Ask a question..."
-            onChange={(e) => setQuestion(e.target.value)}
-            disabled={isLoading}
-          />
+          <p className="text-sm text-muted-foreground mb-2 text-center">
+            Ask a question about your career, effective altruism, or 80,000
+            Hours research
+          </p>
+          <div className="relative">
+            <input
+              className="w-full p-3 text-lg rounded-lg shadow-inner bg-slate-100 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50 tracking-wide"
+              value={question}
+              placeholder="Ask a question..."
+              onChange={(e) => setQuestion(e.target.value)}
+              disabled={isLoading}
+            />
+            {isLoading && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
         </form>
         {answer && (
           <div className="leading-relaxed prose prose-slate max-w-none">

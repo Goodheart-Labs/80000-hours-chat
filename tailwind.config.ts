@@ -66,6 +66,19 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        green: {
+          DEFAULT: "#2dbdd1",
+          50: "#ecfefe",
+          100: "#d1fcfd",
+          200: "#aaf7fa",
+          300: "#71edf5",
+          400: "#3bd9ea",
+          500: "#2dbdd1",
+          600: "#1896af",
+          700: "#10778d",
+          800: "#126072",
+          900: "#114f60",
+        },
       },
       keyframes: {
         "accordion-down": {

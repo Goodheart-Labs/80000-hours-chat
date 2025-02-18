@@ -7,7 +7,7 @@ const fontSans = Mulish({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Career AI",
-  description: "Career AI",
+  description: "AI-powered career guidance based on 80,000 Hours research",
 };
 
 export default function RootLayout({
@@ -20,10 +20,14 @@ export default function RootLayout({
       <body>
         <TooltipProvider>
           <div className="grid grid-rows-[auto_minmax(0,1fr)]">
-            <header>
-              <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Career AI</h1>
-                <span>About</span>
+            <header className="bg-slate-700 text-white p-4">
+              <div className="container mx-auto">
+                <div className="grid md:flex md:items-center md:gap-2 md:justify-between">
+                  <h1 className="text-2xl font-bold">Career AI</h1>
+                  <p className="text-base text-white/60">
+                    AI-powered career guidance based on 80,000 Hours research
+                  </p>
+                </div>
               </div>
             </header>
             {children}

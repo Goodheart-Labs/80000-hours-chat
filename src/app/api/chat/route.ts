@@ -71,24 +71,35 @@ async function replyWithCitations(question: string) {
   const textStream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
-      for await (const message of stream) {
-        console.log(message);
 
+      // Send resources data as first message
+      controller.enqueue(
+        encoder.encode(
+          `data: ${JSON.stringify({
+            type: "resources",
+            resources: resources.map(({ content, similarity, sourceUrl }) => ({
+              content,
+              similarity,
+              sourceUrl,
+            })),
+          })}\n\n`,
+        ),
+      );
+
+      for await (const message of stream) {
         if (message.type === "content_block_delta") {
           if (message.delta.type === "text_delta") {
             controller.enqueue(
               encoder.encode(
-                `data: ${JSON.stringify({ text: message.delta.text })}\n\n`,
+                `data: ${JSON.stringify({ type: "text", text: message.delta.text })}\n\n`,
               ),
             );
           } else if (message.delta.type === "citations_delta") {
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
-                  citation: {
-                    cited_text: message.delta.citation.cited_text,
-                    document_title: message.delta.citation.document_title,
-                  },
+                  type: "citation",
+                  citation: message.delta.citation,
                 })}\n\n`,
               ),
             );
@@ -121,7 +132,7 @@ function createDocuments(
         media_type: "text/plain",
         data: content,
       },
-      // title: sourceUrl,
+      title: sourceUrl,
       context: JSON.stringify({ similarity, sourceUrl }),
       citations: { enabled: true },
     })),
