@@ -2,7 +2,7 @@ import { Citation } from "@/lib/types";
 import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
-import { CitationPopover } from "./CitationTooltip";
+import { CitationCard } from "./CitationCard";
 
 export const MemoizedMarkdown = memo(({ content }: { content: string }) => {
   return (
@@ -15,7 +15,7 @@ export const MemoizedMarkdown = memo(({ content }: { content: string }) => {
             decodeURIComponent(escape(atob(props["data-parsed"]))),
           ) as Citation;
           console.log(citation);
-          return <CitationPopover {...citation} />;
+          return <CitationCard {...citation} />;
         },
       }}
     >
