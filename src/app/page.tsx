@@ -6,11 +6,14 @@ import { StreamChunk } from "@/lib/types";
 import { Resource } from "@/lib/types";
 import { Loader2, FileText } from "lucide-react";
 
+type LoadingPhase = "idle" | "searching" | "processing" | "generating";
+
 export default function Chat() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string>("");
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
 
   const uniqueResources = useMemo(() => {
     // Create a Map to deduplicate by sourceUrl
@@ -28,6 +31,7 @@ export default function Chat() {
     if (!question.trim() || isLoading) return;
 
     setIsLoading(true);
+    setLoadingPhase("searching");
     setAnswer("");
     setResources([]);
 
@@ -60,6 +64,7 @@ export default function Chat() {
               switch (parsed.type) {
                 case "text":
                   if (parsed.text) {
+                    setLoadingPhase("generating");
                     setAnswer((prev) => prev + parsed.text);
                   }
                   break;
@@ -78,6 +83,7 @@ export default function Chat() {
                   break;
                 case "resources":
                   if (parsed.resources) {
+                    setLoadingPhase("processing");
                     setResources(parsed.resources);
                   }
                   break;
@@ -93,8 +99,15 @@ export default function Chat() {
       setAnswer("Sorry, something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
+      setLoadingPhase("idle");
     }
   }
+
+  const loadingMessages = {
+    searching: "Searching through 80,000 Hours knowledge base...",
+    processing: "Analyzing relevant career guidance documents...",
+    generating: "Crafting your personalized response...",
+  };
 
   return (
     <div className="grid w-full max-w-2xl py-12 mx-auto">
@@ -119,6 +132,14 @@ export default function Chat() {
             )}
           </div>
         </form>
+        {isLoading &&
+          loadingPhase !== "idle" &&
+          loadingPhase !== "generating" && (
+            <div className="flex items-center gap-3 text-muted-foreground animate-pulse">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <p>{loadingMessages[loadingPhase]}</p>
+            </div>
+          )}
         {answer && (
           <div className="leading-relaxed prose prose-slate max-w-none">
             <MemoizedMarkdown content={answer} />
