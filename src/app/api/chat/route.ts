@@ -29,7 +29,7 @@ async function replyWithCitations(question: string) {
   const {
     object: { answer },
   } = await generateObject({
-    model: openai("gpt-4o-mini"),
+    model: openai("gpt-3.5-turbo"),
     schema: z.object({
       answer: z.string(),
     }),
@@ -54,7 +54,7 @@ async function replyWithCitations(question: string) {
 
   // Stream message using Anthropic
   const stream = anthropic.messages.stream({
-    model: "claude-3-5-sonnet-latest",
+    model: "claude-3-5-haiku-latest",
     max_tokens: 2048,
     stream: true,
     system:
