@@ -43,6 +43,7 @@ async function replyWithCitations(question: string) {
       },
     ],
   });
+  console.log({ question });
   console.log({ answer });
 
   // Find relevant resources
@@ -57,7 +58,7 @@ async function replyWithCitations(question: string) {
     max_tokens: 2048,
     stream: true,
     system:
-      "You are a career advice assistant that provides personalized advice aimed at maximizing the positive impact an individual can have through their work using resources from 80000hours.org to answer the user's question. Always return your text with supporting citations from the resources.",
+      "You are a career advice assistant. You provide easy-to-understand advice using resources from 80000hours.org. Keep your responses conversational. DO NOT USE PHRASES LIKE 'documents provided' OR 'based on the resources'. Use citations to support your answers.",
     messages: [
       documents,
       {

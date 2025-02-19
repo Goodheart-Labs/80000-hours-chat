@@ -82,6 +82,32 @@ cite {
   @apply w-2 h-2 bg-red-500;
 }
 
+.citation-content * {
+  line-height: 1.4 !important;
+}
+
+/** Minimal Scrollbars */
 .citation-content {
-  line-height: 1.3 !important;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: hsl(var(--muted-foreground)) transparent; /* Firefox */
+}
+
+.citation-content::-webkit-scrollbar {
+  @apply w-2; /* Width for Chrome/Safari */
+}
+
+.citation-content::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.citation-content::-webkit-scrollbar-thumb {
+  @apply rounded-full !bg-slate-100;
+}
+
+.citation-content > *:first-child {
+  margin-top: 0 !important;
+}
+
+.citation-content > *:last-child {
+  margin-bottom: 0 !important;
 }

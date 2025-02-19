@@ -14,7 +14,6 @@ export const MemoizedMarkdown = memo(({ content }: { content: string }) => {
           const citation = JSON.parse(
             decodeURIComponent(escape(atob(props["data-parsed"]))),
           ) as Citation;
-          console.log(citation);
           return <CitationCard {...citation} />;
         },
       }}

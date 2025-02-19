@@ -21,7 +21,7 @@ export const CitationCard = memo(function CitationPopover(citation: Citation) {
           <Quote className="w-3 h-3" fill="currentColor" />
         </Link>
       </Trigger>
-      <HoverCardContent className="overflow-y-auto max-h-[300px] prose prose-sm shadow-lg bg-white/90 border-none backdrop-blur-md citation-content">
+      <HoverCardContent className="overflow-y-auto max-h-[300px] text-sm shadow-lg bg-white/90 border-none backdrop-blur-md citation-content">
         <ReactMarkdown
           components={{
             a: ({ href, children }) => {
@@ -35,11 +35,26 @@ export const CitationCard = memo(function CitationPopover(citation: Citation) {
                 </a>
               );
             },
+            h1: ({ children }) => {
+              return <span className="font-bold">{children}</span>;
+            },
+            h2: ({ children }) => {
+              return <span className="font-bold">{children}</span>;
+            },
+            h3: ({ children }) => {
+              return <span className="font-bold">{children}</span>;
+            },
+            h4: ({ children }) => {
+              return <span className="font-bold">{children}</span>;
+            },
+            h5: ({ children }) => {
+              return <span className="font-bold">{children}</span>;
+            },
           }}
         >
-          {citation.cited_text}
+          {citation.cited_text.trim()}
         </ReactMarkdown>
-        <div className="flex items-center gap-1.5 mb-2">
+        <span className="flex items-center gap-1.5 mb-2">
           <LinkIcon className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
           <a
             href={fullSourceUrl}
@@ -49,7 +64,7 @@ export const CitationCard = memo(function CitationPopover(citation: Citation) {
           >
             {citation.document_title}
           </a>
-        </div>
+        </span>
       </HoverCardContent>
     </HoverCard>
   );
