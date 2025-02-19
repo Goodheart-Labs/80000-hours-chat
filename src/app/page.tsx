@@ -119,6 +119,7 @@ export default function Chat() {
           </p>
           <div className="relative">
             <input
+              type="text"
               className="w-full p-3 text-lg rounded-lg shadow-inner bg-slate-100 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50 tracking-wide"
               value={question}
               placeholder="Ask a question..."
@@ -145,6 +146,27 @@ export default function Chat() {
             <MemoizedMarkdown content={answer} />
           </div>
         )}
+        {!isLoading && answer.length ? (
+          <button
+            className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+            onClick={() => {
+              setQuestion("");
+              setAnswer("");
+              setResources([]);
+              // smooth scroll to top
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              // Find and focus the input element
+              const inputElement = document.querySelector(
+                'input[type="text"]',
+              ) as HTMLInputElement;
+              if (inputElement) {
+                inputElement.focus();
+              }
+            }}
+          >
+            Ask another question
+          </button>
+        ) : null}
         {!isLoading && resources.length > 0 && (
           <div className="grid gap-3 pt-6 border-t">
             <h2 className="font-semibold text-lg">Related Resources</h2>

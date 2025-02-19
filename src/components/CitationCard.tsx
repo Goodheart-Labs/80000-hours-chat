@@ -10,7 +10,7 @@ export const CitationCard = memo(function CitationPopover(citation: Citation) {
   const fullSourceUrl = `https://80000hours.org${citation.document_title}`;
 
   return (
-    <HoverCard openDelay={0} closeDelay={0}>
+    <HoverCard openDelay={0} closeDelay={100}>
       <Trigger asChild>
         <Link
           href={fullSourceUrl}
