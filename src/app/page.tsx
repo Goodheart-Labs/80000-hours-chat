@@ -4,7 +4,12 @@ import { useState, useMemo } from "react";
 import { MemoizedMarkdown } from "@/components/MemoizedMarkdown";
 import { StreamChunk } from "@/lib/types";
 import { Resource } from "@/lib/types";
-import { Loader2, FileText } from "lucide-react";
+import { Loader2, FileText, ChevronDown } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 type LoadingPhase = "idle" | "searching" | "processing" | "generating";
 
@@ -169,28 +174,40 @@ export default function Chat() {
         ) : null}
         {!isLoading && resources.length > 0 && (
           <div className="grid gap-3 pt-6 border-t">
-            <h2 className="font-semibold text-lg">Related Resources</h2>
-            <div className="grid gap-1.5">
-              {uniqueResources.map((resource, i) => (
-                <a
-                  key={i}
-                  href={`https://80000hours.org${resource.sourceUrl}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors"
-                >
-                  <FileText className="h-5 w-5 text-green-600 shrink-0" />
-                  <div className="grid gap-0.5">
-                    <span className="text-green-800 break-all">
-                      {resource.sourceUrl}
-                    </span>
-                    <span className="text-sm text-muted-foreground/70 line-clamp-1">
-                      {resource.content}
-                    </span>
-                  </div>
-                </a>
-              ))}
-            </div>
+            <Collapsible>
+              <CollapsibleTrigger className="grid w-full group">
+                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 transition-colors">
+                  <h2 className="font-semibold text-lg">
+                    {uniqueResources.length} Related{" "}
+                    {uniqueResources.length === 1 ? "Resource" : "Resources"}
+                  </h2>
+                  <ChevronDown className="h-5 w-5 group-aria-expanded:rotate-180" />
+                </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="grid gap-1.5 pt-2">
+                  {uniqueResources.map((resource, i) => (
+                    <a
+                      key={i}
+                      href={`https://80000hours.org${resource.sourceUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors"
+                    >
+                      <FileText className="h-5 w-5 text-green-600 shrink-0" />
+                      <div className="grid gap-0.5">
+                        <span className="text-green-800 break-all">
+                          {resource.sourceUrl}
+                        </span>
+                        <span className="text-sm text-muted-foreground/70 line-clamp-1">
+                          {resource.content}
+                        </span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         )}
       </div>
