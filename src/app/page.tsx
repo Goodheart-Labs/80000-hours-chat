@@ -1,22 +1,39 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { MemoizedMarkdown } from "@/components/MemoizedMarkdown";
-import { StreamChunk } from "@/lib/types";
+import { SimpleMessage, StreamChunk } from "@/lib/types";
 import { Resource } from "@/lib/types";
-import { Loader2, FileText, ChevronDown } from "lucide-react";
+import { Loader2, FileText, ChevronDown, Send } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 type LoadingPhase = "idle" | "searching" | "processing" | "generating";
 
+/** We're going to migrate to a message array so we can have chat functionality */
+
+/** Safely strips citation tags from a message */
+function stripCitationTags(text: string) {
+  const div = document.createElement("div");
+  div.innerHTML = text;
+  // Remove all cite elements
+  div.querySelectorAll("cite").forEach((el) => el.remove());
+  return div.textContent || text;
+}
+
 export default function Chat() {
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState<string>("");
+  const [messages, setMessages] = useState<SimpleMessage[]>([
+    {
+      role: "user",
+      content: "",
+    },
+  ]);
+
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
@@ -32,20 +49,61 @@ export default function Chat() {
     return Array.from(uniqueMap.values());
   }, [resources]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!question.trim() || isLoading) return;
+  // Set answer stores content on the most recent assistant message
+  const setAssistantMessage = useCallback(
+    (textOrCallback: string | ((prev: string) => string)) => {
+      setMessages((prev) => {
+        const lastMessage = prev[prev.length - 1];
+        const content =
+          typeof textOrCallback === "function"
+            ? textOrCallback(lastMessage.content)
+            : textOrCallback;
+        return [...prev.slice(0, -1), { ...lastMessage, content }];
+      });
+    },
+    [],
+  );
+
+  // Sets the most recent user message
+  const setUserMessage = useCallback(
+    (textOrCallback: string | ((prev: string) => string)) => {
+      setMessages((prev) => {
+        const lastMessage = prev[prev.length - 1];
+        const content =
+          typeof textOrCallback === "function"
+            ? textOrCallback(lastMessage.content)
+            : textOrCallback;
+        return [...prev.slice(0, -1), { ...lastMessage, content }];
+      });
+    },
+    [],
+  );
+
+  const submitMessage = useCallback(async () => {
+    if (isLoading) return;
 
     setIsLoading(true);
     setLoadingPhase("searching");
-    setAnswer("");
-    setResources([]);
+
+    // Set up the assistant message
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: "",
+      },
+    ]);
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ content: question }] }),
+        body: JSON.stringify({
+          messages: messages.map((message) => ({
+            ...message,
+            content: stripCitationTags(message.content),
+          })),
+        }),
       });
 
       if (!response.ok) throw new Error("Failed to fetch response");
@@ -71,26 +129,30 @@ export default function Chat() {
                 case "text":
                   if (parsed.text) {
                     setLoadingPhase("generating");
-                    setAnswer((prev) => prev + parsed.text);
+                    setAssistantMessage((text) => text + parsed.text);
                   }
                   break;
                 case "citation":
                   if (parsed.citation) {
+                    console.log("Citation delta received:", parsed.citation);
                     const citationData = btoa(
                       unescape(
                         encodeURIComponent(JSON.stringify(parsed.citation)),
                       ),
                     );
-                    setAnswer(
-                      (prev) =>
-                        prev + `<cite data-parsed="${citationData}"></cite>`,
+                    setAssistantMessage(
+                      (text) =>
+                        text + `<cite data-parsed="${citationData}"></cite>`,
                     );
                   }
                   break;
                 case "resources":
                   if (parsed.resources) {
                     setLoadingPhase("processing");
-                    setResources(parsed.resources);
+                    setResources((resources) => [
+                      ...resources,
+                      ...parsed.resources,
+                    ]);
                   }
                   break;
               }
@@ -102,11 +164,19 @@ export default function Chat() {
       }
     } catch (error) {
       console.error("Error:", error);
-      setAnswer("Sorry, something went wrong. Please try again.");
+      setAssistantMessage("Sorry, something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
       setLoadingPhase("idle");
+
+      // Add a new user message
+      setMessages((prev) => [...prev, { role: "user", content: "" }]);
     }
+  }, [isLoading, messages, setAssistantMessage]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    submitMessage();
   }
 
   const loadingMessages = {
@@ -127,10 +197,10 @@ export default function Chat() {
             <input
               type="text"
               className="w-full p-3 text-lg rounded-lg shadow-inner bg-slate-100 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50 tracking-wide"
-              value={question}
+              value={messages[0].content}
               placeholder="Ask a question..."
-              onChange={(e) => setQuestion(e.target.value)}
-              disabled={isLoading || answer.length > 0}
+              onChange={(e) => setUserMessage(e.target.value)}
+              disabled={messages.length > 1}
             />
             {isLoading && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -139,6 +209,46 @@ export default function Chat() {
             )}
           </div>
         </form>
+        {messages.slice(1).map((message, index) => {
+          if (message.role === "assistant") {
+            return (
+              <div
+                className="leading-relaxed prose prose-slate max-w-none"
+                key={index}
+              >
+                <MemoizedMarkdown content={message.content} />
+              </div>
+            );
+          } else if (message.role === "user") {
+            const stale = isLoading || index + 1 !== messages.length - 1;
+            return (
+              <div className="relative" key={index}>
+                <Textarea
+                  className="w-full bg-slate-100 shadow-inner border-none h-24 resize-none !text-base"
+                  placeholder="Continue the conversation..."
+                  value={message.content}
+                  onChange={(e) => setUserMessage(e.target.value)}
+                  disabled={stale}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      submitMessage();
+                    }
+                  }}
+                />
+                {!stale ? (
+                  <Button
+                    className="absolute right-3 bottom-3 shadow-none bg-slate-200 hover:bg-slate-200"
+                    size="icon"
+                    variant="secondary"
+                    onClick={submitMessage}
+                  >
+                    <Send className="h-4 w-4 -translate-x-px" />
+                  </Button>
+                ) : null}
+              </div>
+            );
+          }
+        })}
         {isLoading &&
           loadingPhase !== "idle" &&
           loadingPhase !== "generating" && (
@@ -147,17 +257,6 @@ export default function Chat() {
               <p>{loadingMessages[loadingPhase]}</p>
             </div>
           )}
-        {answer && (
-          <div className="leading-relaxed prose prose-slate max-w-none">
-            <MemoizedMarkdown content={answer} />
-          </div>
-        )}
-        {!isLoading && answer.length ? (
-          <Textarea
-            className="w-full bg-slate-100 shadow-inner border-none h-24 resize-none !text-base"
-            placeholder="Continue the conversation..."
-          />
-        ) : null}
         {!isLoading && resources.length > 0 && (
           <div className="grid gap-3 pt-6 border-t">
             <Collapsible>

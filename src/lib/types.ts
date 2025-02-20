@@ -26,3 +26,8 @@ export type StreamChunk =
       type: "resources";
       resources: Resource[];
     };
+
+export type SimpleMessage = {
+  role: "user" | "assistant";
+  content: string;
+};

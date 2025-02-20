@@ -1,4 +1,5 @@
 import { findRelevantResources } from "@/lib/actions";
+import { SimpleMessage } from "@/lib/types";
 import { openai } from "@ai-sdk/openai";
 import { Anthropic } from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources/messages/messages";
@@ -17,37 +18,32 @@ const anthropic = new Anthropic({
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages } = (await req.json()) as { messages: SimpleMessage[] };
 
-  const question = messages[messages.length - 1].content;
-
-  return replyWithCitations(question);
+  return replyWithCitations(messages);
 }
 
-async function replyWithCitations(question: string) {
+async function replyWithCitations(messages: SimpleMessage[]) {
   // Generate hypothetical answer to the question
   const {
-    object: { answer },
+    object: { searchQuery },
   } = await generateObject({
     model: openai("gpt-3.5-turbo"),
     schema: z.object({
-      answer: z.string(),
+      searchQuery: z.string(),
     }),
     temperature: 1,
     system:
-      "You are a research assistant for personalized career advice. Come up with a hypothetical one-sentence answer to the user's question to add in locating relevant resources.",
-    messages: [
-      {
-        role: "user",
-        content: [{ type: "text", text: String(question) }],
-      },
-    ],
+      "You are a research assistant for personalized career advice. Based on the conversation, come up with a one-sentence search query to locate relevant resources.",
+    messages: messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
   });
-  console.log({ question });
-  console.log({ answer });
+  console.log({ searchQuery });
 
   // Find relevant resources
-  const resources = await findRelevantResources(answer);
+  const resources = await findRelevantResources(searchQuery);
 
   // Create documents
   const documents = createDocuments(resources);
@@ -58,14 +54,8 @@ async function replyWithCitations(question: string) {
     max_tokens: 2048,
     stream: true,
     system:
-      "You are a career advice assistant. You provide easy-to-understand advice using resources from 80000hours.org. Keep your responses conversational. DO NOT USE PHRASES LIKE 'documents provided' OR 'based on the resources'. Use citations to support your answers.",
-    messages: [
-      documents,
-      {
-        role: "user",
-        content: [{ type: "text", text: String(question) }],
-      },
-    ],
+      "You are a career advice assistant. You provide easy-to-understand, conversational advice using resources from 80000hours.org. AVOID PHRASES LIKE 'documents provided' OR 'based on the resources'. Use resource citations to support your response. Use markdown to format your response.",
+    messages: [documents, ...messages],
   });
 
   // Create a ReadableStream that transforms the Anthropic stream
