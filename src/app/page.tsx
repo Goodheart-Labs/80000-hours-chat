@@ -10,6 +10,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Textarea } from "@/components/ui/textarea";
 
 type LoadingPhase = "idle" | "searching" | "processing" | "generating";
 
@@ -129,7 +130,7 @@ export default function Chat() {
               value={question}
               placeholder="Ask a question..."
               onChange={(e) => setQuestion(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || answer.length > 0}
             />
             {isLoading && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -152,25 +153,10 @@ export default function Chat() {
           </div>
         )}
         {!isLoading && answer.length ? (
-          <button
-            className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-medium py-3 px-6 rounded-lg transition-colors"
-            onClick={() => {
-              setQuestion("");
-              setAnswer("");
-              setResources([]);
-              // smooth scroll to top
-              window.scrollTo({ top: 0, behavior: "smooth" });
-              // Find and focus the input element
-              const inputElement = document.querySelector(
-                'input[type="text"]',
-              ) as HTMLInputElement;
-              if (inputElement) {
-                inputElement.focus();
-              }
-            }}
-          >
-            Ask another question
-          </button>
+          <Textarea
+            className="w-full bg-slate-100 shadow-inner border-none h-24 resize-none !text-base"
+            placeholder="Continue the conversation..."
+          />
         ) : null}
         {!isLoading && resources.length > 0 && (
           <div className="grid gap-3 pt-6 border-t">
