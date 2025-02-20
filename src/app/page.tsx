@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { MemoizedMarkdown } from "@/components/MemoizedMarkdown";
 import { SimpleMessage, StreamChunk } from "@/lib/types";
 import { Resource } from "@/lib/types";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { throttle } from "lodash-es";
 
 type LoadingPhase = "idle" | "searching" | "processing" | "generating";
 
@@ -27,6 +28,7 @@ function stripCitationTags(text: string) {
 }
 
 export default function Chat() {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<SimpleMessage[]>([
     {
       role: "user",
@@ -48,6 +50,19 @@ export default function Chat() {
     });
     return Array.from(uniqueMap.values());
   }, [resources]);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  const throttledScrollToBottom = useMemo(
+    () => throttle(scrollToBottom, 100, { trailing: true }),
+    [scrollToBottom],
+  );
+
+  useEffect(() => {
+    throttledScrollToBottom();
+  }, [messages, throttledScrollToBottom]);
 
   // Set answer stores content on the most recent assistant message
   const setAssistantMessage = useCallback(
@@ -130,6 +145,7 @@ export default function Chat() {
                   if (parsed.text) {
                     setLoadingPhase("generating");
                     setAssistantMessage((text) => text + parsed.text);
+                    throttledScrollToBottom();
                   }
                   break;
                 case "citation":
@@ -169,10 +185,20 @@ export default function Chat() {
       setIsLoading(false);
       setLoadingPhase("idle");
 
-      // Add a new user message
+      // Add a new user message and scroll to bottom
       setMessages((prev) => [...prev, { role: "user", content: "" }]);
+      throttledScrollToBottom();
+      // Put cursor in the active text area
+      setTimeout(() => {
+        const activeTextArea = document.querySelector(
+          "[data-is-active='true']",
+        ) as HTMLTextAreaElement;
+        if (activeTextArea) {
+          activeTextArea.focus();
+        }
+      }, 100);
     }
-  }, [isLoading, messages, setAssistantMessage]);
+  }, [isLoading, messages, setAssistantMessage, throttledScrollToBottom]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -229,6 +255,7 @@ export default function Chat() {
                   value={message.content}
                   onChange={(e) => setUserMessage(e.target.value)}
                   disabled={stale}
+                  data-is-active={!stale}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       submitMessage();
@@ -295,6 +322,7 @@ export default function Chat() {
             </Collapsible>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
     </div>
   );
