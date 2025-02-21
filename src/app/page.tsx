@@ -211,8 +211,14 @@ export default function Chat() {
     generating: "Crafting your personalized response...",
   };
 
+  // Helper function to determine if we should show resources
+  const shouldShowResources = (index: number) => {
+    // Show resources after the assistant's last message
+    return index === messages.length - 2;
+  };
+
   return (
-    <div className="grid w-full max-w-2xl py-12 mx-auto">
+    <div className="max-w-2xl mx-auto py-12 px-4">
       <div className="grid gap-6">
         <form onSubmit={handleSubmit}>
           <p className="text-sm text-muted-foreground mb-2 text-center">
@@ -235,6 +241,7 @@ export default function Chat() {
             )}
           </div>
         </form>
+
         {messages.slice(1).map((message, index) => {
           if (message.role === "assistant") {
             return (
@@ -246,36 +253,81 @@ export default function Chat() {
               </div>
             );
           } else if (message.role === "user") {
-            const stale = isLoading || index + 1 !== messages.length - 1;
             return (
-              <div className="relative" key={index}>
-                <Textarea
-                  className="w-full bg-slate-100 shadow-inner border-none h-24 resize-none !text-base"
-                  placeholder="Continue the conversation..."
-                  value={message.content}
-                  onChange={(e) => setUserMessage(e.target.value)}
-                  disabled={stale}
-                  data-is-active={!stale}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      submitMessage();
-                    }
-                  }}
-                />
-                {!stale ? (
-                  <Button
-                    className="absolute right-3 bottom-3 shadow-none bg-slate-200 hover:bg-slate-200"
-                    size="icon"
-                    variant="secondary"
-                    onClick={submitMessage}
-                  >
-                    <Send className="h-4 w-4 -translate-x-px" />
-                  </Button>
-                ) : null}
-              </div>
+              <>
+                {resources.length > 0 && shouldShowResources(index) && (
+                  <div className="grid gap-3 pt-6 border-t">
+                    <Collapsible>
+                      <CollapsibleTrigger className="grid w-full group">
+                        <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 transition-colors">
+                          <h2 className="font-semibold text-lg">
+                            {uniqueResources.length} Related{" "}
+                            {uniqueResources.length === 1
+                              ? "Resource"
+                              : "Resources"}
+                          </h2>
+                          <ChevronDown className="h-5 w-5 group-aria-expanded:rotate-180" />
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="grid gap-1.5 pt-2">
+                          {uniqueResources.map((resource, i) => (
+                            <a
+                              key={i}
+                              href={`https://80000hours.org${resource.sourceUrl}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors"
+                            >
+                              <FileText className="h-5 w-5 text-green-600 shrink-0" />
+                              <div className="grid gap-0.5">
+                                <span className="text-green-800 break-all">
+                                  {resource.sourceUrl}
+                                </span>
+                                <span className="text-sm text-muted-foreground/70 line-clamp-1">
+                                  {resource.content}
+                                </span>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                )}
+
+                {/* User input textarea */}
+                <div className="relative" key={index}>
+                  <Textarea
+                    className="w-full bg-slate-100 shadow-inner border-none h-24 resize-none !text-base"
+                    placeholder="Continue the conversation..."
+                    value={message.content}
+                    onChange={(e) => setUserMessage(e.target.value)}
+                    disabled={index + 1 !== messages.length - 1}
+                    data-is-active={index + 1 === messages.length - 1}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        submitMessage();
+                      }
+                    }}
+                  />
+                  {index + 1 === messages.length - 1 && (
+                    <Button
+                      className="absolute right-3 bottom-3 shadow-none bg-slate-200 hover:bg-slate-200"
+                      size="icon"
+                      variant="secondary"
+                      onClick={submitMessage}
+                    >
+                      <Send className="h-4 w-4 -translate-x-px" />
+                    </Button>
+                  )}
+                </div>
+              </>
             );
           }
         })}
+
+        {/* Loading state */}
         {isLoading &&
           loadingPhase !== "idle" &&
           loadingPhase !== "generating" && (
@@ -284,44 +336,7 @@ export default function Chat() {
               <p>{loadingMessages[loadingPhase]}</p>
             </div>
           )}
-        {!isLoading && resources.length > 0 && (
-          <div className="grid gap-3 pt-6 border-t">
-            <Collapsible>
-              <CollapsibleTrigger className="grid w-full group">
-                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 transition-colors">
-                  <h2 className="font-semibold text-lg">
-                    {uniqueResources.length} Related{" "}
-                    {uniqueResources.length === 1 ? "Resource" : "Resources"}
-                  </h2>
-                  <ChevronDown className="h-5 w-5 group-aria-expanded:rotate-180" />
-                </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="grid gap-1.5 pt-2">
-                  {uniqueResources.map((resource, i) => (
-                    <a
-                      key={i}
-                      href={`https://80000hours.org${resource.sourceUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors"
-                    >
-                      <FileText className="h-5 w-5 text-green-600 shrink-0" />
-                      <div className="grid gap-0.5">
-                        <span className="text-green-800 break-all">
-                          {resource.sourceUrl}
-                        </span>
-                        <span className="text-sm text-muted-foreground/70 line-clamp-1">
-                          {resource.content}
-                        </span>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        )}
+
         <div ref={messagesEndRef} />
       </div>
     </div>
