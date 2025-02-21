@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  Fragment,
+} from "react";
 import { MemoizedMarkdown } from "@/components/MemoizedMarkdown";
 import { SimpleMessage, StreamChunk } from "@/lib/types";
 import { Resource } from "@/lib/types";
-import { Loader2, FileText, ChevronDown, Send } from "lucide-react";
+import { Loader2, FileText, ChevronDown, Send, Plus } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -35,12 +42,10 @@ export default function Chat() {
       content: "",
     },
   ]);
-
-  const [resources, setResources] = useState<Resource[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<LoadingPhase>("idle");
 
-  const uniqueResources = useMemo(() => {
+  const getUniqueResources = useCallback((resources: Resource[]) => {
     // Create a Map to deduplicate by sourceUrl
     const uniqueMap = new Map();
     resources.forEach((resource) => {
@@ -49,7 +54,7 @@ export default function Chat() {
       }
     });
     return Array.from(uniqueMap.values());
-  }, [resources]);
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -79,6 +84,14 @@ export default function Chat() {
     [],
   );
 
+  // Sets the resources on the most recent assistant message
+  const setAssistantResources = useCallback((resources: Resource[]) => {
+    setMessages((prev) => {
+      const lastMessage = prev[prev.length - 1];
+      return [...prev.slice(0, -1), { ...lastMessage, resources }];
+    });
+  }, []);
+
   // Sets the most recent user message
   const setUserMessage = useCallback(
     (textOrCallback: string | ((prev: string) => string)) => {
@@ -94,6 +107,12 @@ export default function Chat() {
     [],
   );
 
+  // Whether to show resources based on the index
+  const shouldShowResources = (index: number) => {
+    // Only show resources when there is a user message after the assistant message
+    return messages.length - 2 > index;
+  };
+
   const submitMessage = useCallback(async () => {
     if (isLoading) return;
 
@@ -106,6 +125,7 @@ export default function Chat() {
       {
         role: "assistant",
         content: "",
+        resources: [],
       },
     ]);
 
@@ -114,10 +134,19 @@ export default function Chat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: messages.map((message) => ({
-            ...message,
-            content: stripCitationTags(message.content),
-          })),
+          messages: messages.map((message) => {
+            switch (message.role) {
+              case "assistant":
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { resources, ...rest } = message;
+                return {
+                  ...rest,
+                  content: stripCitationTags(message.content),
+                };
+              default:
+                return message;
+            }
+          }),
         }),
       });
 
@@ -156,19 +185,18 @@ export default function Chat() {
                         encodeURIComponent(JSON.stringify(parsed.citation)),
                       ),
                     );
-                    setAssistantMessage(
-                      (text) =>
-                        text + `<cite data-parsed="${citationData}"></cite>`,
-                    );
+                    if (citationData) {
+                      setAssistantMessage(
+                        (text) =>
+                          text + `<cite data-parsed="${citationData}"></cite>`,
+                      );
+                    }
                   }
                   break;
                 case "resources":
                   if (parsed.resources) {
                     setLoadingPhase("processing");
-                    setResources((resources) => [
-                      ...resources,
-                      ...parsed.resources,
-                    ]);
+                    setAssistantResources(parsed.resources);
                   }
                   break;
               }
@@ -195,10 +223,17 @@ export default function Chat() {
         ) as HTMLTextAreaElement;
         if (activeTextArea) {
           activeTextArea.focus();
+          throttledScrollToBottom();
         }
       }, 100);
     }
-  }, [isLoading, messages, setAssistantMessage, throttledScrollToBottom]);
+  }, [
+    isLoading,
+    messages,
+    setAssistantMessage,
+    setAssistantResources,
+    throttledScrollToBottom,
+  ]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -212,117 +247,138 @@ export default function Chat() {
   };
 
   return (
-    <div className="grid w-full max-w-2xl py-12 mx-auto">
-      <div className="grid gap-6">
-        <form onSubmit={handleSubmit}>
-          <p className="text-sm text-muted-foreground mb-2 text-center">
-            Ask a question about your career, effective altruism, or 80,000
-            Hours research
-          </p>
-          <div className="relative">
-            <input
-              type="text"
-              className="w-full p-3 text-lg rounded-lg shadow-inner bg-slate-100 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50 tracking-wide"
-              value={messages[0].content}
-              placeholder="Ask a question..."
-              onChange={(e) => setUserMessage(e.target.value)}
-              disabled={messages.length > 1}
-            />
-            {isLoading && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+    <div className="container mx-auto">
+      <div className="grid lg:grid-cols-[240px_minmax(0,1fr)_200px] py-12 items-start">
+        <div className="sticky top-12 hidden lg:block">
+          <button
+            className="inline-flex items-center gap-2 rounded font-medium p-2 text-slate-600/75 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 w-full transition-colors whitespace-nowrap"
+            onClick={() => {
+              // Reload
+              window.location.reload();
+            }}
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span>New conversation</span>
+          </button>
+        </div>
+
+        <div className="grid gap-6 w-full max-w-2xl mx-auto px-4">
+          <form onSubmit={handleSubmit}>
+            <p className="text-sm text-muted-foreground mb-2 text-center text-balance">
+              Ask a question about your career, effective altruism, or 80,000
+              Hours research
+            </p>
+            <div className="relative">
+              <input
+                type="text"
+                className="w-full p-3 text-lg rounded-lg shadow-inner bg-slate-100 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50 tracking-wide"
+                value={messages[0].content}
+                placeholder="Ask a question..."
+                onChange={(e) => setUserMessage(e.target.value)}
+                disabled={messages.length > 1}
+              />
+              {isLoading && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
+          </form>
+
+          {messages.slice(1).map((message, index) => {
+            if (message.role === "assistant") {
+              const uniqueResources = getUniqueResources(message.resources);
+              return (
+                <Fragment key={index}>
+                  <div className="leading-relaxed prose prose-slate max-w-none">
+                    <MemoizedMarkdown content={message.content} />
+                  </div>
+                  {uniqueResources.length > 0 && shouldShowResources(index) && (
+                    <div className="grid gap-3 pt-6 border-t">
+                      <Collapsible>
+                        <CollapsibleTrigger className="grid w-full group">
+                          <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 transition-colors">
+                            <h2 className="font-semibold text-lg">
+                              {uniqueResources.length} Related{" "}
+                              {uniqueResources.length === 1
+                                ? "Resource"
+                                : "Resources"}
+                            </h2>
+                            <ChevronDown className="h-5 w-5 group-aria-expanded:rotate-180" />
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="grid gap-1.5 pt-2">
+                            {uniqueResources.map((resource, i) => (
+                              <a
+                                key={i}
+                                href={`https://80000hours.org${resource.sourceUrl}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors"
+                              >
+                                <FileText className="h-5 w-5 text-green-600 shrink-0" />
+                                <div className="grid gap-0.5">
+                                  <span className="text-green-800 break-all">
+                                    {resource.sourceUrl}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground/70 line-clamp-1">
+                                    {resource.content}
+                                  </span>
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+                  )}
+                </Fragment>
+              );
+            } else if (message.role === "user") {
+              return (
+                <div className="relative" key={index}>
+                  <Textarea
+                    className="w-full bg-slate-100 shadow-inner border-none h-24 resize-none !text-base"
+                    placeholder="Continue the conversation..."
+                    value={message.content}
+                    onChange={(e) => setUserMessage(e.target.value)}
+                    disabled={index + 1 !== messages.length - 1}
+                    data-is-active={index + 1 === messages.length - 1}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        submitMessage();
+                      }
+                    }}
+                  />
+                  {index + 1 === messages.length - 1 && (
+                    <Button
+                      className="absolute right-3 bottom-3 shadow-none bg-slate-200 hover:bg-slate-200"
+                      size="icon"
+                      variant="secondary"
+                      onClick={submitMessage}
+                    >
+                      <Send className="h-4 w-4 -translate-x-px" />
+                    </Button>
+                  )}
+                </div>
+              );
+            }
+          })}
+
+          {/* Loading state */}
+          {isLoading &&
+            loadingPhase !== "idle" &&
+            loadingPhase !== "generating" && (
+              <div className="flex items-center gap-3 text-muted-foreground animate-pulse">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <p>{loadingMessages[loadingPhase]}</p>
               </div>
             )}
-          </div>
-        </form>
-        {messages.slice(1).map((message, index) => {
-          if (message.role === "assistant") {
-            return (
-              <div
-                className="leading-relaxed prose prose-slate max-w-none"
-                key={index}
-              >
-                <MemoizedMarkdown content={message.content} />
-              </div>
-            );
-          } else if (message.role === "user") {
-            const stale = isLoading || index + 1 !== messages.length - 1;
-            return (
-              <div className="relative" key={index}>
-                <Textarea
-                  className="w-full bg-slate-100 shadow-inner border-none h-24 resize-none !text-base"
-                  placeholder="Continue the conversation..."
-                  value={message.content}
-                  onChange={(e) => setUserMessage(e.target.value)}
-                  disabled={stale}
-                  data-is-active={!stale}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      submitMessage();
-                    }
-                  }}
-                />
-                {!stale ? (
-                  <Button
-                    className="absolute right-3 bottom-3 shadow-none bg-slate-200 hover:bg-slate-200"
-                    size="icon"
-                    variant="secondary"
-                    onClick={submitMessage}
-                  >
-                    <Send className="h-4 w-4 -translate-x-px" />
-                  </Button>
-                ) : null}
-              </div>
-            );
-          }
-        })}
-        {isLoading &&
-          loadingPhase !== "idle" &&
-          loadingPhase !== "generating" && (
-            <div className="flex items-center gap-3 text-muted-foreground animate-pulse">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <p>{loadingMessages[loadingPhase]}</p>
-            </div>
-          )}
-        {!isLoading && resources.length > 0 && (
-          <div className="grid gap-3 pt-6 border-t">
-            <Collapsible>
-              <CollapsibleTrigger className="grid w-full group">
-                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 transition-colors">
-                  <h2 className="font-semibold text-lg">
-                    {uniqueResources.length} Related{" "}
-                    {uniqueResources.length === 1 ? "Resource" : "Resources"}
-                  </h2>
-                  <ChevronDown className="h-5 w-5 group-aria-expanded:rotate-180" />
-                </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="grid gap-1.5 pt-2">
-                  {uniqueResources.map((resource, i) => (
-                    <a
-                      key={i}
-                      href={`https://80000hours.org${resource.sourceUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-100 transition-colors"
-                    >
-                      <FileText className="h-5 w-5 text-green-600 shrink-0" />
-                      <div className="grid gap-0.5">
-                        <span className="text-green-800 break-all">
-                          {resource.sourceUrl}
-                        </span>
-                        <span className="text-sm text-muted-foreground/70 line-clamp-1">
-                          {resource.content}
-                        </span>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
+
+          <div ref={messagesEndRef} />
+        </div>
+        <div className="hidden lg:block" />
       </div>
     </div>
   );

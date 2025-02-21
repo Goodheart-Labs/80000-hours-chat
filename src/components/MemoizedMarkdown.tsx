@@ -12,6 +12,9 @@ export const MemoizedMarkdown = memo(({ content }: { content: string }) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cite: (props: any) => {
           try {
+            if (!props["data-parsed"]) {
+              return null;
+            }
             const citation = JSON.parse(
               decodeURIComponent(escape(atob(props["data-parsed"].trim()))),
             ) as Citation;
