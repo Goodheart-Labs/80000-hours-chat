@@ -371,7 +371,7 @@ export default function Chat() {
                   />
                   {index + 1 === messages.length - 1 && (
                     <Button
-                      className="absolute right-3 bottom-3 shadow-none bg-slate-200 hover:bg-slate-200"
+                      className="rounded-xl absolute right-2 bottom-2 shadow-none bg-transparent hover:bg-slate-200 transition-colors"
                       size="icon"
                       variant="secondary"
                       onClick={submitMessage}
