@@ -269,13 +269,24 @@ export default function Chat() {
               Hours research
             </p>
             <div className="relative">
-              <input
-                type="text"
-                className="w-full p-3 text-lg rounded-lg shadow-inner bg-slate-100 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50 tracking-wide"
+              <textarea
+                className="w-full p-3 text-lg rounded-lg shadow-inner bg-slate-100 placeholder:text-muted-foreground focus-visible:outline-none disabled:opacity-50 tracking-wide resize-none overflow-hidden min-h-[52px] max-h-[200px]"
                 value={messages[0].content}
                 placeholder="Ask a question..."
-                onChange={(e) => setUserMessage(e.target.value)}
+                onChange={(e) => {
+                  setUserMessage(e.target.value);
+                  // Auto-resize
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${e.target.scrollHeight}px`;
+                }}
                 disabled={messages.length > 1}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submitMessage();
+                  }
+                }}
+                rows={1}
               />
               {isLoading && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -339,21 +350,28 @@ export default function Chat() {
               return (
                 <div className="relative" key={index}>
                   <Textarea
-                    className="w-full bg-slate-100 shadow-inner border-none h-24 resize-none !text-base"
+                    className="w-full bg-slate-100 shadow-inner border-none resize-none !text-base min-h-[52px] max-h-[200px] overflow-hidden"
                     placeholder="Continue the conversation..."
                     value={message.content}
-                    onChange={(e) => setUserMessage(e.target.value)}
+                    onChange={(e) => {
+                      setUserMessage(e.target.value);
+                      // Auto-resize
+                      e.target.style.height = "auto";
+                      e.target.style.height = `${e.target.scrollHeight}px`;
+                    }}
                     disabled={index + 1 !== messages.length - 1}
                     data-is-active={index + 1 === messages.length - 1}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
                         submitMessage();
                       }
                     }}
+                    rows={1}
                   />
                   {index + 1 === messages.length - 1 && (
                     <Button
-                      className="absolute right-3 bottom-3 shadow-none bg-slate-200 hover:bg-slate-200"
+                      className="rounded-xl absolute right-2 bottom-2 shadow-none bg-transparent hover:bg-slate-200 transition-colors"
                       size="icon"
                       variant="secondary"
                       onClick={submitMessage}
